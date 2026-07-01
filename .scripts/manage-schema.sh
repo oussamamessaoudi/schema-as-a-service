@@ -47,6 +47,15 @@ if [ "$MODE" = "validate" ]; then
         --data "$PAYLOAD" \
         "$SCHEMA_REGISTRY_URL/compatibility/subjects/$SUBJECT/versions/latest")
     
+    # Intercept brand-new schemas (Error code 40402: Subject/Version not found)
+    ERROR_CODE=$(echo "$RESPONSE" | jq -r '.error_code // empty')
+    if [ "$ERROR_CODE" = "40402" ]; then
+        MSG="ℹ️ **Notice:** Subject does not exist yet. Bypassing validation for initial registration."
+        [ -n "${GITHUB_STEP_SUMMARY:-}" ] && echo "$MSG" >> "$GITHUB_STEP_SUMMARY"
+        echo "$MSG"
+        exit 0
+    fi
+
     # Check both camelCase and snake_case variations for Confluent/Aiven API flexibility
     IS_COMPATIBLE=$(echo "$RESPONSE" | jq -r '.isCompatible // .is_compatible // false')
     if [ "$IS_COMPATIBLE" != "true" ]; then
