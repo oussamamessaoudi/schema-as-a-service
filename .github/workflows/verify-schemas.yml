@@ -5,6 +5,7 @@ on:
     branches: [ main ]
   push:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   generate-matrix:
@@ -56,12 +57,11 @@ jobs:
           chmod +x ./.scripts/manage-schema.sh
           ./.scripts/manage-schema.sh validate "${{ matrix.schema-pair.subject }}" "${{ matrix.schema-pair.path }}"
 
-  # ─── ADD THIS NEW JOB AT THE BOTTOM ─────────────────────────────────
   schema-gatekeeper:
     name: "All Schema Validations Passed"
     needs: [validate-contracts]
     runs-on: ubuntu-latest
-    if: always() # Ensures this runs even if a matrix job fails
+    if: always()
     steps:
       - name: Evaluate Matrix Results
         run: |
