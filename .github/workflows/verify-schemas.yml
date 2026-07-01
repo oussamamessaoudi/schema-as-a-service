@@ -26,13 +26,14 @@ jobs:
           JSON_ARRAY=$(ls schemas | jq -R . | jq -s -c \
           --argjson envs "$ENV_LIST" \
           'map(
-            . as $filename | 
+            . as $filename |
             if contains("{env}") then
-              [ $envs[] | {
-                env: .,
-                path: ("schemas/" + $filename),
-                subject: ($filename | gsub("\\{env\\}"; .) | sub("\\.[^.]+$"; ""))
-              } ]
+              [ $envs[] as $e | {
+                  env: $e,
+                  path: ("schemas/" + $filename),
+                  subject: ($filename | gsub("\\{env\\}"; $e) | sub("\\.[^.]+$"; ""))
+                }
+              ]
             else
               [{
                 env: "none",
@@ -42,8 +43,7 @@ jobs:
             end
           ) | flatten')
 
-          echo "matrix=${JSON_ARRAY}" >> $GITHUB_OUTPUT
-
+          echo "matrix=${JSON_ARRAY}" >> "$GITHUB_OUTPUT"
 
   validate-contracts:
     name: Validate
@@ -53,7 +53,7 @@ jobs:
       fail-fast: false
       matrix:
         schema-pair: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
-    
+
     env:
       SCHEMA_REGISTRY_URL: ${{ secrets.SR_URL }}
       SCHEMA_REGISTRY_API_KEY: ${{ secrets.SR_API_KEY }}
