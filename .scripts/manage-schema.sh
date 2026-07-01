@@ -5,14 +5,6 @@ MODE="${1:-validate}"
 SUBJECT="${2}"
 SCHEMA_PATH="${3}"
 
-# Initialize Github Step Summary headers if running inside a GitHub Runner
-if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
-    {
-        echo "### $([ "$MODE" = "validate" ] && echo "🔍 Verification" || echo "🚀 Deployment"): \`$SUBJECT\`"
-        echo "- **File:** \`$SCHEMA_PATH\`"
-    } >> "$GITHUB_STEP_SUMMARY"
-fi
-
 # 1. Determine Schema Type from file extension
 EXTENSION="${SCHEMA_PATH##*.}"
 case "$EXTENSION" in
@@ -21,7 +13,10 @@ case "$EXTENSION" in
     proto) SCHEMA_TYPE="PROTOBUF" ;;
     *)     
         MSG="❌ Error: Unsupported file extension .$EXTENSION"
-        [ -n "${GITHUB_STEP_SUMMARY:-}" ] && echo "$MSG" >> "$GITHUB_STEP_SUMMARY"
+        if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+            echo "### 🔍 Verification Error: \`$SUBJECT\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "$MSG" >> "$GITHUB_STEP_SUMMARY"
+        fi
         echo "$MSG"; exit 1 
         ;;
 esac
@@ -50,29 +45,38 @@ if [ "$MODE" = "validate" ]; then
     # Intercept brand-new schemas (Error code 40402: Subject/Version not found)
     ERROR_CODE=$(echo "$RESPONSE" | jq -r '.error_code // empty')
     if [ "$ERROR_CODE" = "40402" ]; then
-        MSG="ℹ️ **Notice:** Subject does not exist yet. Bypassing validation for initial registration."
-        [ -n "${GITHUB_STEP_SUMMARY:-}" ] && echo "$MSG" >> "$GITHUB_STEP_SUMMARY"
-        echo "$MSG"
+        if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+            {
+                echo "### 🔍 Verification: \`$SUBJECT\`"
+                echo "- **File:** \`$SCHEMA_PATH\`"
+                echo "ℹ️ **Notice:** Subject does not exist yet. Bypassing validation for initial registration."
+            } >> "$GITHUB_STEP_SUMMARY"
+        fi
+        echo "Subject does not exist yet. Bypassing validation."
         exit 0
     fi
 
-    # ─── EXTRACTION & SILENT SKIP FOR UNCHANGED SCHEMAS ────────────────
     IS_COMPATIBLE=$(echo "$RESPONSE" | jq -r '.isCompatible // .is_compatible // false')
     HAS_MESSAGES=$(echo "$RESPONSE" | jq -r '.messages // [] | length')
 
+    # ─── SILENT SKIP FOR UNCHANGED SCHEMAS ─────────────────────────────
+    # Exit early without writing anything to GITHUB_STEP_SUMMARY
     if [ "$IS_COMPATIBLE" = "true" ] && [ "$HAS_MESSAGES" -eq 0 ]; then
-        echo "ℹ️ No changes detected for schema: $SUBJECT. Skipping processing."
+        echo "ℹ️ No changes detected for schema: $SUBJECT. Skipping processing entirely."
         exit 0
     fi
-    # ───────────────────────────────────────────────────────────────────
 
+    # ─── REAL COMPATIBILITY FAILURE DETECTED ───────────────────────────
     if [ "$IS_COMPATIBLE" != "true" ]; then
         # Format the breaking changes text into a single-line string for PR comments
         COMPAT_ERRORS=$(echo "$RESPONSE" | jq -c -r '.messages // [.message] | join(", ")')
         echo "Incompatible changes found in fields: ${COMPAT_ERRORS}" >&2
 
+        # Initialize the summary layout ONLY when an actual error occurs
         if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
             {
+                echo "### 🔍 Verification: \`$SUBJECT\`"
+                echo "- **File:** \`$SCHEMA_PATH\`"
                 echo "❌ **Result:** Schema compatibility check failed!"
                 echo "#### Registry Error Details:"
                 echo "\`\`\`json"
@@ -85,10 +89,25 @@ if [ "$MODE" = "validate" ]; then
         exit 1
     fi
     
-    [ -n "${GITHUB_STEP_SUMMARY:-}" ] && echo "✅ **Result:** Schema is fully compatible." >> "$GITHUB_STEP_SUMMARY"
+    # ─── REAL SUCCESSFUL UPDATE (COMPATIBLE CHANGES INTRODUCED) ────────
+    if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+        {
+            echo "### 🔍 Verification: \`$SUBJECT\`"
+            echo "- **File:** \`$SCHEMA_PATH\`"
+            echo "✅ **Result:** Schema is fully compatible."
+        } >> "$GITHUB_STEP_SUMMARY"
+    fi
     echo "Schema is compatible."
 
 elif [ "$MODE" = "push" ]; then
+    # Initialize summary layout immediately for deployments
+    if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+        {
+            echo "### 🚀 Deployment: \`$SUBJECT\`"
+            echo "- **File:** \`$SCHEMA_PATH\`"
+        } >> "$GITHUB_STEP_SUMMARY"
+    fi
+
     echo "Registering new version for subject: $SUBJECT..."
     RESPONSE=$(curl -s -X POST "${AUTH_FLAGS[@]}" \
         -H "Content-Type: application/vnd.schemaregistry.v1+json" \
