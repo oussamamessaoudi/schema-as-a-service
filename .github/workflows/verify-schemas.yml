@@ -23,22 +23,26 @@ jobs:
       - name: Build Schema Map
         id: set-matrix
         run: |
-          # Use the env variable directly inside jq
+          # Generate matrix with dynamic {env} expansion
           JSON_ARRAY=$(ls schemas | jq -R . | jq -s -c \
             --argjson envs "$ENV_LIST" \
-            'map(. as $filename | 
-              ($filename | split(".")[0]) as $base | 
-              (if $base | contains("{env}") then $envs[] else null end) as $env | 
-              {
-                env: $env,
-                path: ("schemas/" + $filename),
-                subject: (
-                  if $env != null 
-                  then ($base | sub("{env}"; $env))
-                  else ($base)
-                  end
-                )
-              }
+            'map(
+              . as $filename | 
+              if $filename | contains("{env}") then
+                # Expand into a matrix row for each environment in the list
+                $envs[] | {
+                  env: .,
+                  path: ("schemas/" + $filename),
+                  subject: ($filename | gsub("\\{env\\}"; .) | sub("\\.[^.]+$"; ""))
+                }
+              else
+                # Process as a single, environment-agnostic entry
+                {
+                  env: "all",
+                  path: ("schemas/" + $filename),
+                  subject: ($filename | sub("\\.[^.]+$"; ""))
+                }
+              end
             )')
           
           echo "matrix=${JSON_ARRAY}" >> $GITHUB_OUTPUT

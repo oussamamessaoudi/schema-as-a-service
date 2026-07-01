@@ -30,25 +30,19 @@ jobs:
         env:
           TARGET_ENV: ${{ inputs.environment }}
         run: |
-          # Use the user-selected environment instead of hardcoding all three
           JSON_ARRAY=$(ls schemas | jq -R . | jq -s -c \
-            --arg env "$TARGET_ENV" \
-            'map(. as $filename | 
-              ($filename | split(".")[0]) as $base | 
-              # If file has {env}, replace with selected env. Else, return single object.
-              (if $base | contains("{env}") then $env else null end) as $selected_env | 
-              {
-                env: $selected_env,
-                path: ("schemas/" + $filename),
-                subject: (
-                  if $selected_env != null 
-                  then ($base | sub("{env}"; $selected_env))
-                  else ($base)
-                  end
-                )
-              }
-            )')
-          
+          --arg env "$TARGET_ENV" \
+          'map(
+            . as $filename | 
+            {
+              env: (if $filename | contains("{env}") then $env else "all" end),
+              path: ("schemas/" + $filename),
+              # Use gsub to replace {env} with the actual env value if present
+              # Then remove the .json or .avsc extension to get the clean subject
+              subject: ($filename | gsub("\\{env\\}"; $env) | sub("\\.[^.]+$"; ""))
+            }
+          )')
+
           echo "matrix=${JSON_ARRAY}" >> $GITHUB_OUTPUT
 
   publish-contracts:
