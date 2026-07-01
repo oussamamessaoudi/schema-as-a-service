@@ -23,15 +23,16 @@ jobs:
       - name: Build Schema Map
         id: set-matrix
         run: |
-          JSON_ARRAY=$(ls schemas | jq -R -n \
+          JSON_ARRAY=$(ls schemas | jq -R . | jq -s -c \
             --argjson envs "$ENV_LIST" \
-            '[inputs | . as $filename | 
+            'map(
+              . as $filename | 
               if contains("{env}") then
-                ($envs[] | {
+                $envs[] | {
                   env: .,
                   path: ("schemas/" + $filename),
                   subject: ($filename | gsub("\\{env\\}"; .) | sub("\\.[^.]+$"; ""))
-                })
+                }
               else
                 {
                   env: "none",
@@ -39,9 +40,10 @@ jobs:
                   subject: ($filename | sub("\\.[^.]+$"; ""))
                 }
               end
-            ]')
+            )')
 
           echo "matrix=${JSON_ARRAY}" >> $GITHUB_OUTPUT
+
 
   validate-contracts:
     name: Validate
