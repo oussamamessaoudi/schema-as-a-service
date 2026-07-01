@@ -1,6 +1,6 @@
 name: "Schema Engine: Publish"
 
-run-name: "🚀 Schema Engine: Publish to 🟢 ${{ inputs.environments }}"
+run-name: "🚀 Schema Engine: Publish to 🟢 ${{ inputs.environment }}"
 
 on:
   workflow_dispatch:
