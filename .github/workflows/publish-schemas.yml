@@ -1,4 +1,4 @@
-name: "Schema Engine: Deployment"
+name: "Schema Engine: Publish"
 
 on:
   workflow_dispatch:
