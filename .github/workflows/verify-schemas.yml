@@ -25,25 +25,25 @@ jobs:
         run: |
           # Generate matrix with dynamic {env} expansion
           JSON_ARRAY=$(ls schemas | jq -R . | jq -s -c \
-            --argjson envs "$ENV_LIST" \
-            'map(
-              . as $filename | 
-              if $filename | contains("{env}") then
-                # Return an array of objects, one for each env
-                [ $envs[] | {
-                  env: .,
-                  path: ("schemas/" + $filename),
-                  subject: ($filename | gsub("\\{env\\}"; .) | sub("\\.[^.]+$"; ""))
-                } ]
-              else
-                # Return an array containing one object
-                [{
-                  env: "all",
-                  path: ("schemas/" + $filename),
-                  subject: ($filename | sub("\\.[^.]+$"; ""))
-                }]
-              end
-            ) | flatten')
+          --argjson envs "$ENV_LIST" \
+          'map(
+            . as $filename | 
+            if $filename | contains("{env}") then
+              # Return an array of objects, one for each env
+              [ $envs[] | {
+                env: .,
+                path: ("schemas/" + $filename),
+                subject: ($filename | gsub("\\{env\\}"; .) | sub("\\.[^.]+$"; ""))
+              } ]
+            else
+              # Return an array containing one single object
+              [{
+                env: "all",
+                path: ("schemas/" + $filename),
+                subject: ($filename | sub("\\.[^.]+$"; ""))
+              }]
+            end
+          ) | flatten')
 
           echo "matrix=${JSON_ARRAY}" >> $GITHUB_OUTPUT
 
