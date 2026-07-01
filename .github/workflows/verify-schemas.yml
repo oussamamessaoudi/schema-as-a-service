@@ -18,7 +18,6 @@ jobs:
         id: set-matrix
         run: |
           cd schemas
-          # -c guarantees a clean, compact single-line JSON string for the matrix
           JSON_ARRAY=$(jq -c --null-input '$ARGS.positional | map({
             subject: (split(".")[0] + "-value"), 
             path: ("schemas/" + .)
@@ -47,3 +46,21 @@ jobs:
         run: |
           chmod +x ./.scripts/manage-schema.sh
           ./.scripts/manage-schema.sh validate "${{ matrix.schema-pair.subject }}" "${{ matrix.schema-pair.path }}"
+
+  # ─── ADD THIS NEW JOB AT THE BOTTOM ─────────────────────────────────
+  schema-gatekeeper:
+    name: "All Schema Validations Passed"
+    needs: [validate-contracts]
+    runs-on: ubuntu-latest
+    if: always() # Ensures this runs even if a matrix job fails
+    steps:
+      - name: Evaluate Matrix Results
+        run: |
+          RESULT="${{ needs.validate-contracts.result }}"
+          if [ "$RESULT" = "success" ]; then
+            echo "✅ All parallel schema jobs passed successfully."
+            exit 0
+          else
+            echo "❌ One or more schema matrix validations failed."
+            exit 1
+          fi
