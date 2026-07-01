@@ -1,7 +1,17 @@
 name: "Schema Engine: Deployment"
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target Environment'
+        required: true
+        default: 'ta'
+        type: choice
+        options:
+        - ta
+        - ti
+        - pp
 
 jobs:
   generate-matrix:
@@ -15,18 +25,27 @@ jobs:
 
       - name: Build Schema Map
         id: set-matrix
+        env:
+          TARGET_ENV: ${{ inputs.environment }}
         run: |
-          ENVS='["ta", "ti", "pp"]'
-          FILES=$(ls schemas | jq -R . | jq -s .)
-          
-          JSON_ARRAY=$(jq -c -n \
-            --argjson envs "$ENVS" \
-            --argjson files "$FILES" \
-            '$files | [ .[] | select(contains("{env}")) | {file: ., env: $envs[]} ] | map({
-              env: .env,
-              path: ("schemas/" + .file),
-              subject: (.file | sub("{env}"; .env) | split(".")[0] + "-value")
-            })')
+          # Use the user-selected environment instead of hardcoding all three
+          JSON_ARRAY=$(ls schemas | jq -R . | jq -s -c \
+            --arg env "$TARGET_ENV" \
+            'map(. as $filename | 
+              ($filename | split(".")[0]) as $base | 
+              # If file has {env}, replace with selected env. Else, return single object.
+              (if $base | contains("{env}") then $env else null end) as $selected_env | 
+              {
+                env: $selected_env,
+                path: ("schemas/" + $filename),
+                subject: (
+                  if $selected_env != null 
+                  then ($base | sub("{env}"; $selected_env) + "-value")
+                  else ($base + "-value")
+                  end
+                )
+              }
+            )')
           
           echo "matrix=${JSON_ARRAY}" >> $GITHUB_OUTPUT
 
