@@ -37,6 +37,24 @@ fi
 # 4. Execute API calls based on operational MODE
 if [ "$MODE" = "validate" ]; then
     echo "Validating compatibility for subject: $SUBJECT..."
+    
+    # ─── LOCAL IDENTICAL CHECK ─────────────────────────────────────────
+    # Fetch the latest registered schema version to perform a structural diff
+    LATEST_SCHEMA_RESP=$(curl -s "${AUTH_FLAGS[@]}" "$SCHEMA_REGISTRY_URL/subjects/$SUBJECT/versions/latest" || echo "{}")
+    LATEST_ERROR=$(echo "$LATEST_SCHEMA_RESP" | jq -r '.error_code // empty')
+    
+    if [ -z "$LATEST_ERROR" ] && [ "$LATEST_SCHEMA_RESP" != "{}" ]; then
+        # Minimize and normalize both schemas to ignore whitespace/formatting differences
+        LOCAL_NORMALIZED=$(jq -c . "$SCHEMA_PATH" 2>/dev/null || echo "1")
+        REMOTE_NORMALIZED=$(echo "$LATEST_SCHEMA_RESP" | jq -c '.schema | fromjson' 2>/dev/null || echo "2")
+        
+        if [ "$LOCAL_NORMALIZED" = "$REMOTE_NORMALIZED" ]; then
+            echo "ℹ️ Local schema is identical to the remote baseline. Skipping processing entirely."
+            exit 0
+        fi
+    fi
+    # ───────────────────────────────────────────────────────────────────
+
     RESPONSE=$(curl -s -X POST "${AUTH_FLAGS[@]}" \
         -H "Content-Type: application/vnd.schemaregistry.v1+json" \
         --data "$PAYLOAD" \
@@ -57,22 +75,12 @@ if [ "$MODE" = "validate" ]; then
     fi
 
     IS_COMPATIBLE=$(echo "$RESPONSE" | jq -r '.isCompatible // .is_compatible // false')
-    HAS_MESSAGES=$(echo "$RESPONSE" | jq -r '.messages // [] | length')
-
-    # ─── SILENT SKIP FOR UNCHANGED SCHEMAS ─────────────────────────────
-    # Exit early without writing anything to GITHUB_STEP_SUMMARY
-    if [ "$IS_COMPATIBLE" = "true" ] && [ "$HAS_MESSAGES" -eq 0 ]; then
-        echo "ℹ️ No changes detected for schema: $SUBJECT. Skipping processing entirely."
-        exit 0
-    fi
 
     # ─── REAL COMPATIBILITY FAILURE DETECTED ───────────────────────────
     if [ "$IS_COMPATIBLE" != "true" ]; then
-        # Format the breaking changes text into a single-line string for PR comments
         COMPAT_ERRORS=$(echo "$RESPONSE" | jq -c -r '.messages // [.message] | join(", ")')
-        echo "Incompatible changes found in fields: ${COMPAT_ERRORS}" >&2
+        echo "Incompatible changes found: ${COMPAT_ERRORS}" >&2
 
-        # Initialize the summary layout ONLY when an actual error occurs
         if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
             {
                 echo "### 🔍 Verification: \`$SUBJECT\`"
@@ -89,7 +97,7 @@ if [ "$MODE" = "validate" ]; then
         exit 1
     fi
     
-    # ─── REAL SUCCESSFUL UPDATE (COMPATIBLE CHANGES INTRODUCED) ────────
+    # ─── SUCCESSFUL EVOLUTION (COMPATIBLE CHANGES INTRODUCED) ──────────
     if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
         {
             echo "### 🔍 Verification: \`$SUBJECT\`"
@@ -100,7 +108,6 @@ if [ "$MODE" = "validate" ]; then
     echo "Schema is compatible."
 
 elif [ "$MODE" = "push" ]; then
-    # Initialize summary layout immediately for deployments
     if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
         {
             echo "### 🚀 Deployment: \`$SUBJECT\`"
