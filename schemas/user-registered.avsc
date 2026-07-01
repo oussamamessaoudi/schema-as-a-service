@@ -2,27 +2,42 @@
   "type": "record",
   "name": "UserRegistered",
   "namespace": "com.example.events",
-  "doc": "Event emitted when a new user registers an account.",
+  "doc": "Event emitted immediately after a new user creates an account on the platform.",
   "fields": [
     {
       "name": "eventId",
       "type": "string",
-      "doc": "Unique UUID for this lifecycle event."
+      "doc": "Unique UUIDv4 identifier for tracking this specific event instance."
+    },
+    {
+      "name": "timestamp",
+      "type": "long",
+      "doc": "Epoch milliseconds timestamp indicating when the user profile was created."
     },
     {
       "name": "userId",
       "type": "string",
-      "doc": "The unique identifier assigned to the user."
+      "doc": "Unique internal system identifier assigned to the new user account."
     },
     {
       "name": "email",
       "type": "string",
-      "doc": "The primary email address provided by the user."
+      "doc": "Primary email address associated with the account registration."
     },
     {
-      "name": "registeredAt",
-      "type": "long",
-      "doc": "Epoch millisecond timestamp indicating when the user profile was established."
+      "name": "accountType",
+      "type": {
+        "type": "enum",
+        "name": "AccountType",
+        "symbols": ["INDIVIDUAL", "BUSINESS"]
+      },
+      "doc": "The structural tier or type of account created by the customer."
+    },
+    {
+      "name": "marketingOptIn",
+      "type": "boolean",
+      "default": false,
+      "doc": "Indicates whether the user gave explicit consent to receive promotional newsletters."
     }
   ]
 }
