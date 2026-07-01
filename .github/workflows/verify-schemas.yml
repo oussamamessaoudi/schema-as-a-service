@@ -23,17 +23,23 @@ jobs:
           ENVS='["ta", "ti", "pp"]'
           FILES=$(ls schemas | jq -R . | jq -s .)
           
+          # Logic: If file has {env}, expand it. Otherwise, use filename as-is.
           JSON_ARRAY=$(jq -c -n \
             --argjson envs "$ENVS" \
             --argjson files "$FILES" \
-            '$files | [ .[] | select(contains("{env}")) | {file: ., env: $envs[]} ] | map({
+            '$files | [ .[] | {file: ., env: $envs[]} ] | map({
               env: .env,
               path: ("schemas/" + .file),
-              subject: (.file | sub("{env}"; .env) | split(".")[0] + "-value")
+              subject: (
+                if .file | contains("{env}") 
+                then (.file | sub("{env}"; .env) | split(".")[0] + "-value")
+                else (.file | split(".")[0] + "-" + .env + "-value")
+                end
+              )
             })')
           
           echo "matrix=${JSON_ARRAY}" >> $GITHUB_OUTPUT
-
+          
   validate-contracts:
     name: Validate
     needs: [generate-matrix]
