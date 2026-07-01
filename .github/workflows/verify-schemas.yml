@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  ASYNCAPI_CLI_VERSION: "1.13.1"   # pin to avoid silent CLI drift breaking CI
+  ASYNCAPI_CLI_VERSION: "6.0.2"   # @asyncapi/cli 5.x+ requires Node >=24 — see setup-node step below
 
 jobs:
   generate-matrix:
@@ -76,6 +76,11 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
 
       - name: Cache AsyncAPI CLI
         id: cache-asyncapi
