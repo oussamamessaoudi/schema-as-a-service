@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/order-placed.schema.json",
+  "title": "OrderPlaced",
+  "type": "object",
+  "description": "Event schema for an order placement confirmation.",
+  "properties": {
+    "orderId": {
+      "type": "string",
+      "description": "Unique identifier for the transactional order."
+    },
+    "customerId": {
+      "type": "string",
+      "description": "Unique identifier linking to the buyer's account."
+    },
+    "amount": {
+      "type": "number",
+      "description": "Total purchase price in currency units."
+    },
+    "currency": {
+      "type": "string",
+      "enum": ["CAD", "USD", "EUR"],
+      "default": "CAD"
+    }
+  },
+  "required": ["orderId", "customerId", "amount"]
+}

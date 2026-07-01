@@ -1,0 +1,28 @@
+{
+  "type": "record",
+  "name": "UserRegistered",
+  "namespace": "com.example.events",
+  "doc": "Event emitted when a new user registers an account.",
+  "fields": [
+    {
+      "name": "eventId",
+      "type": "string",
+      "doc": "Unique UUID for this lifecycle event."
+    },
+    {
+      "name": "userId",
+      "type": "string",
+      "doc": "The unique identifier assigned to the user."
+    },
+    {
+      "name": "email",
+      "type": "string",
+      "doc": "The primary email address provided by the user."
+    },
+    {
+      "name": "registeredAt",
+      "type": "long",
+      "doc": "Epoch millisecond timestamp indicating when the user profile was established."
+    }
+  ]
+}

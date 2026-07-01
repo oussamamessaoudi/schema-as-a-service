@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package com.example.events;
+
+option java_multiple_files = true;
+option java_package = "com.example.events.payment";
+
+// Schema for payment status tracking
+message PaymentProcessed {
+  string payment_id = 1;
+  string order_id = 2;
+  double amount = 3;
+  
+  enum Status {
+    UNKNOWN = 0;
+    SUCCESS = 1;
+    FAILED = 2;
+    DECLINED = 3;
+  }
+  
+  Status status = 4;
+  int64 processed_at = 5; 
+}
