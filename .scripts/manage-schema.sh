@@ -5,14 +5,6 @@ MODE="${1:-validate}"
 SUBJECT="${2}"
 SCHEMA_PATH="${3}"
 
-# Initialize Github Step Summary headers if running inside a GitHub Runner
-if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
-    {
-        echo "### $([ "$MODE" = "validate" ] && echo "🔍 Verification" || echo "🚀 Deployment"): \`$SUBJECT\`"
-        echo "- **File:** \`$SCHEMA_PATH\`"
-    } >> "$GITHUB_STEP_SUMMARY"
-fi
-
 # 1. Determine Schema Type from file extension
 EXTENSION="${SCHEMA_PATH##*.}"
 case "$EXTENSION" in
@@ -21,7 +13,10 @@ case "$EXTENSION" in
     proto) SCHEMA_TYPE="PROTOBUF" ;;
     *)     
         MSG="❌ Error: Unsupported file extension .$EXTENSION"
-        [ -n "${GITHUB_STEP_SUMMARY:-}" ] && echo "$MSG" >> "$GITHUB_STEP_SUMMARY"
+        if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+            echo "### 🔍 Verification Error: \`$SUBJECT\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "$MSG" >> "$GITHUB_STEP_SUMMARY"
+        fi
         echo "$MSG"; exit 1 
         ;;
 esac
@@ -41,7 +36,24 @@ fi
 
 # 4. Execute API calls based on operational MODE
 if [ "$MODE" = "validate" ]; then
-    echo "Validating compatibility for subject: $SUBJECT..."
+    echo "Checking if schema already exists for subject: $SUBJECT..."
+    
+    # ─── NATIVE REGISTRY EXISTENCE CHECK ───────────────────────────────
+    # POST to /subjects/{subject} returns the version if the schema matches exactly
+    EXIST_CHECK_RESP=$(curl -s -X POST "${AUTH_FLAGS[@]}" \
+        -H "Content-Type: application/vnd.schemaregistry.v1+json" \
+        --data "$PAYLOAD" \
+        "$SCHEMA_REGISTRY_URL/subjects/$SUBJECT")
+    
+    EXISTING_VERSION=$(echo "$EXIST_CHECK_RESP" | jq -r '.version // empty')
+    
+    if [ -n "$EXISTING_VERSION" ]; then
+        echo "ℹ️ Schema matches version $EXISTING_VERSION exactly. Skipping summary and logs."
+        exit 0
+    fi
+    # ───────────────────────────────────────────────────────────────────
+
+    echo "Validating compatibility for updated schema..."
     RESPONSE=$(curl -s -X POST "${AUTH_FLAGS[@]}" \
         -H "Content-Type: application/vnd.schemaregistry.v1+json" \
         --data "$PAYLOAD" \
@@ -50,17 +62,28 @@ if [ "$MODE" = "validate" ]; then
     # Intercept brand-new schemas (Error code 40402: Subject/Version not found)
     ERROR_CODE=$(echo "$RESPONSE" | jq -r '.error_code // empty')
     if [ "$ERROR_CODE" = "40402" ]; then
-        MSG="ℹ️ **Notice:** Subject does not exist yet. Bypassing validation for initial registration."
-        [ -n "${GITHUB_STEP_SUMMARY:-}" ] && echo "$MSG" >> "$GITHUB_STEP_SUMMARY"
-        echo "$MSG"
+        if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+            {
+                echo "### 🔍 Verification: \`$SUBJECT\`"
+                echo "- **File:** \`$SCHEMA_PATH\`"
+                echo "ℹ️ **Notice:** Subject does not exist yet. Bypassing validation for initial registration."
+            } >> "$GITHUB_STEP_SUMMARY"
+        fi
+        echo "Subject does not exist yet. Bypassing validation."
         exit 0
     fi
 
-    # Check both camelCase and snake_case variations for Confluent/Aiven API flexibility
     IS_COMPATIBLE=$(echo "$RESPONSE" | jq -r '.isCompatible // .is_compatible // false')
+
+    # ─── REAL COMPATIBILITY FAILURE DETECTED ───────────────────────────
     if [ "$IS_COMPATIBLE" != "true" ]; then
+        COMPAT_ERRORS=$(echo "$RESPONSE" | jq -c -r '.messages // [.message] | join(", ")')
+        echo "Incompatible changes found: ${COMPAT_ERRORS}" >&2
+
         if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
             {
+                echo "### 🔍 Verification: \`$SUBJECT\`"
+                echo "- **File:** \`$SCHEMA_PATH\`"
                 echo "❌ **Result:** Schema compatibility check failed!"
                 echo "#### Registry Error Details:"
                 echo "\`\`\`json"
@@ -73,10 +96,24 @@ if [ "$MODE" = "validate" ]; then
         exit 1
     fi
     
-    [ -n "${GITHUB_STEP_SUMMARY:-}" ] && echo "✅ **Result:** Schema is fully compatible." >> "$GITHUB_STEP_SUMMARY"
+    # ─── SUCCESSFUL EVOLUTION (COMPATIBLE CHANGES INTRODUCED) ──────────
+    if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+        {
+            echo "### 🔍 Verification: \`$SUBJECT\`"
+            echo "- **File:** \`$SCHEMA_PATH\`"
+            echo "✅ **Result:** Schema is fully compatible."
+        } >> "$GITHUB_STEP_SUMMARY"
+    fi
     echo "Schema is compatible."
 
 elif [ "$MODE" = "push" ]; then
+    if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+        {
+            echo "### 🚀 Deployment: \`$SUBJECT\`"
+            echo "- **File:** \`$SCHEMA_PATH\`"
+        } >> "$GITHUB_STEP_SUMMARY"
+    fi
+
     echo "Registering new version for subject: $SUBJECT..."
     RESPONSE=$(curl -s -X POST "${AUTH_FLAGS[@]}" \
         -H "Content-Type: application/vnd.schemaregistry.v1+json" \
@@ -85,6 +122,9 @@ elif [ "$MODE" = "push" ]; then
     
     SCHEMA_ID=$(echo "$RESPONSE" | jq -r '.id // empty')
     if [ -z "$SCHEMA_ID" ]; then
+        REG_ERROR=$(echo "$RESPONSE" | jq -c -r '.message // "Unknown registration error"')
+        echo "Registration failed: ${REG_ERROR}" >&2
+
         if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
             {
                 echo "❌ **Result:** Schema registration failed!"

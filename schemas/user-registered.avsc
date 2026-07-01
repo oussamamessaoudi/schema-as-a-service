@@ -2,7 +2,7 @@
   "type": "record",
   "name": "UserRegistered",
   "namespace": "com.example.events",
-  "doc": "Event emitted when a new user registers an account.",
+  "doc": "Event emitted immediately after a new user creates an account on the platform.",
   "fields": [
     {
       "name": "eventId",
@@ -23,6 +23,18 @@
       "name": "registeredAt",
       "type": "long",
       "doc": "Epoch millisecond timestamp indicating when the user profile was established."
+    },
+    {
+      "name": "accountType",
+      "type": "string",
+      "default": "INDIVIDUAL",
+      "doc": "The structural tier or type of account created by the customer (e.g., INDIVIDUAL, BUSINESS)."
+    },
+    {
+      "name": "marketingOptIn",
+      "type": "boolean",
+      "default": false,
+      "doc": "Indicates whether the user gave explicit consent to receive promotional newsletters."
     }
   ]
 }
