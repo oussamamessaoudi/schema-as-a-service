@@ -20,22 +20,27 @@ jobs:
       - name: Build Schema Map
         id: set-matrix
         run: |
-          # Create cross-product of files and environments
           JSON_ARRAY=$(ls schemas | jq -R . | jq -s -c \
-            'map(. as $f | ["ta", "ti", "pp"][] | {
-              env: .,
-              path: ("schemas/" + $f),
-              subject: (
-                if $f | contains("{env}") 
-                then ($f | sub("{env}"; .) | split(".")[0] + "-value")
-                else ($f | split(".")[0] + "-" + . + "-value")
-                end
-              )
-            })')
+            'map(. as $filename | 
+              ($filename | split(".")[0]) as $base | 
+              # If file contains {env}, we iterate over the 3 environments
+              # Otherwise, we create one single object for that file
+              (if $base | contains("{env}") 
+               then ["ta", "ti", "pp"][] 
+               else [null] end) as $env | 
+              {
+                env: $env,
+                path: ("schemas/" + $filename),
+                subject: (
+                  if $env != null 
+                  then ($base | sub("{env}"; $env) + "-value")
+                  else ($base + "-value")
+                  end
+                )
+              }
+            )')
           
           echo "matrix=${JSON_ARRAY}" >> $GITHUB_OUTPUT
-          # Debugging: show the matrix in logs
-          echo "Generated Matrix: $JSON_ARRAY"
 
   validate-contracts:
     name: Validate
