@@ -36,24 +36,24 @@ fi
 
 # 4. Execute API calls based on operational MODE
 if [ "$MODE" = "validate" ]; then
-    echo "Validating compatibility for subject: $SUBJECT..."
+    echo "Checking if schema already exists for subject: $SUBJECT..."
     
-    # ─── ROBUST LOCAL IDENTICAL CHECK ──────────────────────────────────
-    LATEST_SCHEMA_RESP=$(curl -s "${AUTH_FLAGS[@]}" "$SCHEMA_REGISTRY_URL/subjects/$SUBJECT/versions/latest" || echo "{}")
-    LATEST_ERROR=$(echo "$LATEST_SCHEMA_RESP" | jq -r '.error_code // empty')
+    # ─── NATIVE REGISTRY EXISTENCE CHECK ───────────────────────────────
+    # POST to /subjects/{subject} returns the version if the schema matches exactly
+    EXIST_CHECK_RESP=$(curl -s -X POST "${AUTH_FLAGS[@]}" \
+        -H "Content-Type: application/vnd.schemaregistry.v1+json" \
+        --data "$PAYLOAD" \
+        "$SCHEMA_REGISTRY_URL/subjects/$SUBJECT")
     
-    if [ -z "$LATEST_ERROR" ] && [ "$LATEST_SCHEMA_RESP" != "{}" ]; then
-        # Parse, strip whitespaces, and systematically sort keys for accurate structural validation
-        LOCAL_NORMALIZED=$(jq --sort-keys -c . "$SCHEMA_PATH" 2>/dev/null || echo "1")
-        REMOTE_NORMALIZED=$(echo "$LATEST_SCHEMA_RESP" | jq -r '.schema' | jq --sort-keys -c . 2>/dev/null || echo "2")
-        
-        if [ "$LOCAL_NORMALIZED" = "$REMOTE_NORMALIZED" ]; then
-            echo "ℹ️ Local schema is structurally identical to the remote baseline. Skipping summary and log additions entirely."
-            exit 0
-        fi
+    EXISTING_VERSION=$(echo "$EXIST_CHECK_RESP" | jq -r '.version // empty')
+    
+    if [ -n "$EXISTING_VERSION" ]; then
+        echo "ℹ️ Schema matches version $EXISTING_VERSION exactly. Skipping summary and logs."
+        exit 0
     fi
     # ───────────────────────────────────────────────────────────────────
 
+    echo "Validating compatibility for updated schema..."
     RESPONSE=$(curl -s -X POST "${AUTH_FLAGS[@]}" \
         -H "Content-Type: application/vnd.schemaregistry.v1+json" \
         --data "$PAYLOAD" \
