@@ -42,3 +42,43 @@ jobs:
             )')
           
           echo "matrix=${JSON_ARRAY}" >> $GITHUB_OUTPUT
+
+  validate-contracts:
+    name: Validate
+    needs: [generate-matrix]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        schema-pair: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
+    
+    env:
+      SCHEMA_REGISTRY_URL: ${{ secrets.SR_URL }}
+      SCHEMA_REGISTRY_API_KEY: ${{ secrets.SR_API_KEY }}
+      SCHEMA_REGISTRY_API_SECRET: ${{ secrets.SR_API_SECRET }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7
+
+      - name: Run Compatibility Check
+        run: |
+          chmod +x ./.scripts/manage-schema.sh
+          ./.scripts/manage-schema.sh validate "${{ matrix.schema-pair.subject }}" "${{ matrix.schema-pair.path }}"
+
+  schema-gatekeeper:
+    name: "All Schema Validations Passed"
+    needs: [validate-contracts]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Evaluate Matrix Results
+        run: |
+          RESULT="${{ needs.validate-contracts.result }}"
+          if [ "$RESULT" = "success" ]; then
+            echo "✅ All parallel schema jobs passed successfully."
+            exit 0
+          else
+            echo "❌ One or more schema matrix validations failed."
+            exit 1
+          fi
