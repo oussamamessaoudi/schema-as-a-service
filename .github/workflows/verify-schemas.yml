@@ -24,23 +24,23 @@ jobs:
         id: set-matrix
         run: |
           JSON_ARRAY=$(ls schemas | jq -R . | jq -s -c \
-            --argjson envs "$ENV_LIST" \
-            'map(
-              . as $filename | 
-              if contains("{env}") then
-                $envs[] | {
-                  env: .,
-                  path: ("schemas/" + $filename),
-                  subject: ($filename | gsub("\\{env\\}"; .) | sub("\\.[^.]+$"; ""))
-                }
-              else
-                {
-                  env: "none",
-                  path: ("schemas/" + $filename),
-                  subject: ($filename | sub("\\.[^.]+$"; ""))
-                }
-              end
-            )')
+          --argjson envs "$ENV_LIST" \
+          'map(
+            . as $filename | 
+            if contains("{env}") then
+              [ $envs[] | {
+                env: .,
+                path: ("schemas/" + $filename),
+                subject: ($filename | gsub("\\{env\\}"; .) | sub("\\.[^.]+$"; ""))
+              } ]
+            else
+              [{
+                env: "none",
+                path: ("schemas/" + $filename),
+                subject: ($filename | sub("\\.[^.]+$"; ""))
+              }]
+            end
+          ) | flatten')
 
           echo "matrix=${JSON_ARRAY}" >> $GITHUB_OUTPUT
 
