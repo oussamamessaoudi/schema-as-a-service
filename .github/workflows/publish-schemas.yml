@@ -1,6 +1,6 @@
 name: "Schema Engine: Publish"
 
-run-name: "🚀 Schema Engine: Publish to ${{ inputs.environment }}"
+run-name: "🚀 Schema Engine: Publish to \"${{ inputs.environment }}\""
 
 on:
   workflow_dispatch:
@@ -8,12 +8,12 @@ on:
       environment:
         description: 'Target Environment'
         required: true
-        default: 'TA'
+        default: 'ta'
         type: choice
         options:
-        - TA
-        - TI
-        - PP
+        - ta
+        - ti
+        - pp
 
 jobs:
   generate-matrix:
