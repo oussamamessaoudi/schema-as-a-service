@@ -7,26 +7,27 @@
     {
       "name": "eventId",
       "type": "string",
-      "doc": "Unique UUIDv4 identifier for tracking this specific event instance."
-    },
-    {
-      "name": "timestamp",
-      "type": "string",
-      "doc": "ISO-8601 UTC timestamp string indicating when the user profile was created."
+      "doc": "Unique UUID for this lifecycle event."
     },
     {
       "name": "userId",
       "type": "string",
-      "doc": "Unique internal system identifier assigned to the new user account."
+      "doc": "The unique identifier assigned to the user."
     },
     {
       "name": "email",
       "type": "string",
-      "doc": "Primary email address associated with the account registration."
+      "doc": "The primary email address provided by the user."
+    },
+    {
+      "name": "registeredAt",
+      "type": "long",
+      "doc": "Epoch millisecond timestamp indicating when the user profile was established."
     },
     {
       "name": "accountType",
       "type": "string",
+      "default": "INDIVIDUAL",
       "doc": "The structural tier or type of account created by the customer (e.g., INDIVIDUAL, BUSINESS)."
     },
     {
