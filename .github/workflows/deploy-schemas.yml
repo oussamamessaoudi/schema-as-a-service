@@ -1,8 +1,7 @@
 name: "Schema Engine: Deployment"
 
 on:
-  push:
-    branches: [ main ]
+  workflow_dispatch: {}
 
 jobs:
   generate-matrix:

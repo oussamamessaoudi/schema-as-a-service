@@ -3,6 +3,8 @@ name: "Schema Engine: Verification"
 on:
   pull_request:
     branches: [ main ]
+  push:
+    branches: [ main ]
 
 jobs:
   generate-matrix:
