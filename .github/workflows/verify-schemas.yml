@@ -19,11 +19,18 @@ jobs:
       - name: Build Schema Map
         id: set-matrix
         run: |
-          cd schemas
-          JSON_ARRAY=$(jq -c --null-input '$ARGS.positional | map({
-            subject: (split(".")[0] + "-value"), 
-            path: ("schemas/" + .)
-          })' --args -- *)
+          ENVS='["ta", "ti", "pp"]'
+          FILES=$(ls schemas | jq -R . | jq -s .)
+          
+          JSON_ARRAY=$(jq -c -n \
+            --argjson envs "$ENVS" \
+            --argjson files "$FILES" \
+            '$files | [ .[] | select(contains("{env}")) | {file: ., env: $envs[]} ] | map({
+              env: .env,
+              path: ("schemas/" + .file),
+              subject: (.file | sub("{env}"; .env) | split(".")[0] + "-value")
+            })')
+          
           echo "matrix=${JSON_ARRAY}" >> $GITHUB_OUTPUT
 
   validate-contracts:
