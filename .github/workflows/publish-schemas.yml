@@ -33,7 +33,7 @@ jobs:
           JSON_ARRAY=$(ls schemas | jq -R . | jq -s -c \
           --arg env "$TARGET_ENV" \
           'map(
-            . as $filename | 
+            . as $filename |
             {
               env: (if $filename | contains("{env}") then $env else "all" end),
               path: ("schemas/" + $filename),
@@ -43,7 +43,7 @@ jobs:
             }
           )')
 
-          echo "matrix=${JSON_ARRAY}" >> $GITHUB_OUTPUT
+          echo "matrix=${JSON_ARRAY}" >> "$GITHUB_OUTPUT"
 
   publish-contracts:
     name: Release
@@ -53,7 +53,7 @@ jobs:
       fail-fast: false
       matrix:
         schema-pair: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
-    
+
     env:
       SCHEMA_REGISTRY_URL: ${{ secrets.SR_URL }}
       SCHEMA_REGISTRY_API_KEY: ${{ secrets.SR_API_KEY }}

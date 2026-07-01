@@ -7,21 +7,23 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+env:
+  ASYNCAPI_CLI_VERSION: "1.13.1"   # pin to avoid silent CLI drift breaking CI
+
 jobs:
   generate-matrix:
-    name: Scan Contracts Folder
+    name: Scan Schemas Folder
     runs-on: ubuntu-latest
-    # Define the list here to use it as a reference
     env:
       ENV_LIST: '["ta", "ti", "pp"]'
     outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      schema-matrix: ${{ steps.set-schema-matrix.outputs.matrix }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v7
 
       - name: Build Schema Map
-        id: set-matrix
+        id: set-schema-matrix
         run: |
           JSON_ARRAY=$(ls schemas | jq -R . | jq -s -c \
           --argjson envs "$ENV_LIST" \
@@ -45,14 +47,14 @@ jobs:
 
           echo "matrix=${JSON_ARRAY}" >> "$GITHUB_OUTPUT"
 
-  validate-contracts:
+  validate-schemas:
     name: Validate
     needs: [generate-matrix]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        schema-pair: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
+        schema-pair: ${{ fromJson(needs.generate-matrix.outputs.schema-matrix) }}
 
     env:
       SCHEMA_REGISTRY_URL: ${{ secrets.SR_URL }}
@@ -68,19 +70,82 @@ jobs:
           chmod +x ./.scripts/manage-schema.sh
           ./.scripts/manage-schema.sh validate "${{ matrix.schema-pair.subject }}" "${{ matrix.schema-pair.path }}"
 
+  validate-asyncapi-contracts:
+    name: Validate AsyncAPI Contracts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7
+
+      - name: Cache AsyncAPI CLI
+        id: cache-asyncapi
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm-global-asyncapi
+          key: asyncapi-cli-${{ env.ASYNCAPI_CLI_VERSION }}-${{ runner.os }}
+
+      - name: Install AsyncAPI CLI
+        if: steps.cache-asyncapi.outputs.cache-hit != 'true'
+        run: npm install --prefix ~/.npm-global-asyncapi @asyncapi/cli@${{ env.ASYNCAPI_CLI_VERSION }}
+
+      - name: Validate all AsyncAPI files
+        id: validate
+        run: |
+          ASYNCAPI="$HOME/.npm-global-asyncapi/node_modules/.bin/asyncapi"
+          FAILED=0
+          FAILED_FILES=()
+
+          shopt -s nullglob
+          for file in contracts/*.yaml; do
+            echo "Validating $file..."
+            ERROR_OUTPUT=$("$ASYNCAPI" validate "$file" 2>&1) && STATUS=0 || STATUS=$?
+            echo "$ERROR_OUTPUT"
+
+            if [ "$STATUS" -ne 0 ]; then
+              echo "❌ $file failed validation"
+              FAILED=1
+              FAILED_FILES+=("$file")
+              # Persist the error so the summary step can render it after this step exits
+              {
+                echo "### ❌ \`$file\`"
+                echo '```'
+                echo "$ERROR_OUTPUT"
+                echo '```'
+                echo
+              } >> asyncapi-failures.md
+            fi
+          done
+
+          echo "failed=$FAILED" >> "$GITHUB_OUTPUT"
+
+          if [ "$FAILED" -eq 1 ]; then
+            echo "Failed files: ${FAILED_FILES[*]}"
+            exit 1
+          fi
+
+      - name: Publish failure summary
+        if: always() && steps.validate.outputs.failed == '1'
+        run: |
+          {
+            echo "## AsyncAPI Contract Validation"
+            echo "One or more contracts failed validation:"
+            echo
+            cat asyncapi-failures.md
+          } >> "$GITHUB_STEP_SUMMARY"
+
   schema-gatekeeper:
     name: "All Schema Validations Passed"
-    needs: [validate-contracts]
+    needs: [validate-schemas, validate-asyncapi-contracts]
     runs-on: ubuntu-latest
     if: always()
     steps:
       - name: Evaluate Matrix Results
         run: |
-          RESULT="${{ needs.validate-contracts.result }}"
-          if [ "$RESULT" = "success" ]; then
-            echo "✅ All parallel schema jobs passed successfully."
+          if [ "${{ needs.validate-schemas.result }}" = "success" ] && \
+             [ "${{ needs.validate-asyncapi-contracts.result }}" = "success" ]; then
+            echo "✅ All parallel schema and contract validations passed successfully."
             exit 0
           else
-            echo "❌ One or more schema matrix validations failed."
+            echo "❌ One or more schema/contract validations failed."
             exit 1
           fi
