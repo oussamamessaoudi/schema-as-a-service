@@ -1,6 +1,6 @@
 name: "Schema Engine: Publish"
 
-run-name: "Publish to [${{ inputs.environment }}] by @${{ github.actor }}"
+run-name: "🚀 Schema Engine: Publish to ${{ inputs.environments }}"
 
 on:
   workflow_dispatch:
