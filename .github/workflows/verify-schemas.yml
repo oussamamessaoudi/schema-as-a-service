@@ -34,8 +34,8 @@ jobs:
                 path: ("schemas/" + $filename),
                 subject: (
                   if $env != null 
-                  then ($base | sub("{env}"; $env) + "-value")
-                  else ($base + "-value")
+                  then ($base | sub("{env}"; $env))
+                  else ($base)
                   end
                 )
               }

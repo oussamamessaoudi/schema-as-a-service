@@ -1,0 +1,26 @@
+asyncapi: 3.0.0
+info:
+  title: Order Processing Schemas
+  version: 1.0.0
+
+channels:
+  orderPlaced:
+    address: orders.placed.{env}
+    messages:
+      orderPlacedEvent:
+        $ref: '#/components/messages/OrderPlaced'
+  paymentProcessed:
+    address: payments.processed.{env}
+    messages:
+      paymentProcessedEvent:
+        $ref: '#/components/messages/PaymentProcessed'
+
+components:
+  messages:
+    OrderPlaced:
+      payload:
+        $ref: '../schemas/order-placed-{env}-value.json'
+    PaymentProcessed:
+      schemaFormat: application/vnd.google.protobuf
+      payload:
+        $ref: '../schemas/payment-processed-{env}-value.proto'
