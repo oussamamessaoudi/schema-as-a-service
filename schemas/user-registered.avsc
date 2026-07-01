@@ -11,8 +11,8 @@
     },
     {
       "name": "timestamp",
-      "type": "long",
-      "doc": "Epoch milliseconds timestamp indicating when the user profile was created."
+      "type": "string",
+      "doc": "ISO-8601 UTC timestamp string indicating when the user profile was created."
     },
     {
       "name": "userId",
@@ -26,12 +26,8 @@
     },
     {
       "name": "accountType",
-      "type": {
-        "type": "enum",
-        "name": "AccountType",
-        "symbols": ["INDIVIDUAL", "BUSINESS"]
-      },
-      "doc": "The structural tier or type of account created by the customer."
+      "type": "string",
+      "doc": "The structural tier or type of account created by the customer (e.g., INDIVIDUAL, BUSINESS)."
     },
     {
       "name": "marketingOptIn",
