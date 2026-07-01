@@ -24,11 +24,10 @@ jobs:
         id: set-matrix
         run: |
           # Generate matrix with dynamic {env} expansion
-          JSON_ARRAY=$(ls schemas | jq -R -s \
+          JSON_ARRAY=$(ls schemas | jq -R -n \
           --argjson envs "$ENV_LIST" \
-          'split("\n") | map(select(length > 0)) | map(
-            . as $filename |
-            if $filename | contains("{env}") then
+          '[inputs | . as $filename | 
+            if contains("{env}") then
               $envs[] | {
                 env: .,
                 path: ("schemas/" + $filename),
@@ -41,7 +40,7 @@ jobs:
                 subject: ($filename | sub("\\.[^.]+$"; ""))
               }
             end
-          ) | add')
+          ]')
 
           echo "matrix=${JSON_ARRAY}" >> $GITHUB_OUTPUT
 
