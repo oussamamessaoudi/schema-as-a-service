@@ -29,22 +29,22 @@ jobs:
             'map(
               . as $filename | 
               if $filename | contains("{env}") then
-                # Expand into a matrix row for each environment in the list
-                $envs[] | {
+                # Return an array of objects, one for each env
+                [ $envs[] | {
                   env: .,
                   path: ("schemas/" + $filename),
                   subject: ($filename | gsub("\\{env\\}"; .) | sub("\\.[^.]+$"; ""))
-                }
+                } ]
               else
-                # Process as a single, environment-agnostic entry
-                {
+                # Return an array containing one object
+                [{
                   env: "all",
                   path: ("schemas/" + $filename),
                   subject: ($filename | sub("\\.[^.]+$"; ""))
-                }
+                }]
               end
-            )')
-          
+            ) | flatten')
+
           echo "matrix=${JSON_ARRAY}" >> $GITHUB_OUTPUT
 
   validate-contracts:
