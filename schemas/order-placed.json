@@ -3,7 +3,7 @@
   "$id": "https://example.com/order-placed.schema.json",
   "title": "OrderPlaced",
   "type": "object",
-  "description": "Event schema for an order placement confirmation just a change.",
+  "description": "Event schema for an order placement confirmation just a change +1.",
   "properties": {
     "orderId": {
       "type": "string",
