@@ -47,7 +47,8 @@ if [ "$MODE" = "validate" ]; then
         --data "$PAYLOAD" \
         "$SCHEMA_REGISTRY_URL/compatibility/subjects/$SUBJECT/versions/latest")
     
-    IS_COMPATIBLE=$(echo "$RESPONSE" | jq -r '.isCompatible // false')
+    # Check both camelCase and snake_case variations for Confluent/Aiven API flexibility
+    IS_COMPATIBLE=$(echo "$RESPONSE" | jq -r '.isCompatible // .is_compatible // false')
     if [ "$IS_COMPATIBLE" != "true" ]; then
         if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
             {
