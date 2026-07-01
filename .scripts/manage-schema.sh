@@ -56,9 +56,21 @@ if [ "$MODE" = "validate" ]; then
         exit 0
     fi
 
-    # Check both camelCase and snake_case variations for Confluent/Aiven API flexibility
+    # ─── EXTRACTION & SILENT SKIP FOR UNCHANGED SCHEMAS ────────────────
     IS_COMPATIBLE=$(echo "$RESPONSE" | jq -r '.isCompatible // .is_compatible // false')
+    HAS_MESSAGES=$(echo "$RESPONSE" | jq -r '.messages // [] | length')
+
+    if [ "$IS_COMPATIBLE" = "true" ] && [ "$HAS_MESSAGES" -eq 0 ]; then
+        echo "ℹ️ No changes detected for schema: $SUBJECT. Skipping processing."
+        exit 0
+    fi
+    # ───────────────────────────────────────────────────────────────────
+
     if [ "$IS_COMPATIBLE" != "true" ]; then
+        # Format the breaking changes text into a single-line string for PR comments
+        COMPAT_ERRORS=$(echo "$RESPONSE" | jq -c -r '.messages // [.message] | join(", ")')
+        echo "Incompatible changes found in fields: ${COMPAT_ERRORS}" >&2
+
         if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
             {
                 echo "❌ **Result:** Schema compatibility check failed!"
@@ -85,6 +97,9 @@ elif [ "$MODE" = "push" ]; then
     
     SCHEMA_ID=$(echo "$RESPONSE" | jq -r '.id // empty')
     if [ -z "$SCHEMA_ID" ]; then
+        REG_ERROR=$(echo "$RESPONSE" | jq -c -r '.message // "Unknown registration error"')
+        echo "Registration failed: ${REG_ERROR}" >&2
+
         if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
             {
                 echo "❌ **Result:** Schema registration failed!"
