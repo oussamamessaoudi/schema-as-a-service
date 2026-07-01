@@ -10,7 +10,7 @@
       "description": "Unique identifier for the transactional order."
     },
     "customerId": {
-      "type": "integer",
+      "type": "string",
       "description": "Unique identifier linking to the buyer's account."
     },
     "amount": {
