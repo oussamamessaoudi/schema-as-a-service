@@ -38,18 +38,17 @@ fi
 if [ "$MODE" = "validate" ]; then
     echo "Validating compatibility for subject: $SUBJECT..."
     
-    # ─── LOCAL IDENTICAL CHECK ─────────────────────────────────────────
-    # Fetch the latest registered schema version to perform a structural diff
+    # ─── ROBUST LOCAL IDENTICAL CHECK ──────────────────────────────────
     LATEST_SCHEMA_RESP=$(curl -s "${AUTH_FLAGS[@]}" "$SCHEMA_REGISTRY_URL/subjects/$SUBJECT/versions/latest" || echo "{}")
     LATEST_ERROR=$(echo "$LATEST_SCHEMA_RESP" | jq -r '.error_code // empty')
     
     if [ -z "$LATEST_ERROR" ] && [ "$LATEST_SCHEMA_RESP" != "{}" ]; then
-        # Minimize and normalize both schemas to ignore whitespace/formatting differences
-        LOCAL_NORMALIZED=$(jq -c . "$SCHEMA_PATH" 2>/dev/null || echo "1")
-        REMOTE_NORMALIZED=$(echo "$LATEST_SCHEMA_RESP" | jq -c '.schema | fromjson' 2>/dev/null || echo "2")
+        # Parse, strip whitespaces, and systematically sort keys for accurate structural validation
+        LOCAL_NORMALIZED=$(jq --sort-keys -c . "$SCHEMA_PATH" 2>/dev/null || echo "1")
+        REMOTE_NORMALIZED=$(echo "$LATEST_SCHEMA_RESP" | jq -r '.schema' | jq --sort-keys -c . 2>/dev/null || echo "2")
         
         if [ "$LOCAL_NORMALIZED" = "$REMOTE_NORMALIZED" ]; then
-            echo "ℹ️ Local schema is identical to the remote baseline. Skipping processing entirely."
+            echo "ℹ️ Local schema is structurally identical to the remote baseline. Skipping summary and log additions entirely."
             exit 0
         fi
     fi
