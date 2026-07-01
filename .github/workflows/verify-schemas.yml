@@ -20,24 +20,22 @@ jobs:
       - name: Build Schema Map
         id: set-matrix
         run: |
-          ENVS='["ta", "ti", "pp"]'
-          FILES=$(ls schemas | jq -R . | jq -s .)
-          
-          JSON_ARRAY=$(jq -c -n \
-            --argjson envs "$ENVS" \
-            --argjson files "$FILES" \
-            '$files | [ .[] | {file: ., env: $envs[]} ] | map({
-              env: .env,
-              path: ("schemas/" + .file),
+          # Create cross-product of files and environments
+          JSON_ARRAY=$(ls schemas | jq -R . | jq -s -c \
+            'map(. as $f | ["ta", "ti", "pp"][] | {
+              env: .,
+              path: ("schemas/" + $f),
               subject: (
-                if .file | contains("{env}") 
-                then (.file | sub("{env}"; .env) | split(".")[0] + "-value")
-                else (.file | split(".")[0] + "-" + .env + "-value")
+                if $f | contains("{env}") 
+                then ($f | sub("{env}"; .) | split(".")[0] + "-value")
+                else ($f | split(".")[0] + "-" + . + "-value")
                 end
               )
             })')
           
           echo "matrix=${JSON_ARRAY}" >> $GITHUB_OUTPUT
+          # Debugging: show the matrix in logs
+          echo "Generated Matrix: $JSON_ARRAY"
 
   validate-contracts:
     name: Validate
@@ -57,7 +55,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v7
 
-      - name: Run Compatibility Check via script
+      - name: Run Compatibility Check
         run: |
           chmod +x ./.scripts/manage-schema.sh
           ./.scripts/manage-schema.sh validate "${{ matrix.schema-pair.subject }}" "${{ matrix.schema-pair.path }}"
