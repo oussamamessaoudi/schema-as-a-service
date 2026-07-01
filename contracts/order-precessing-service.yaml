@@ -19,8 +19,8 @@ components:
   messages:
     OrderPlaced:
       payload:
-        $ref: '../schemas/order-placed-{env}-value.json'
+        $ref: '../schemas/orders-placed-{env}-value.json'
     PaymentProcessed:
       schemaFormat: application/vnd.google.protobuf
       payload:
-        $ref: '../schemas/payment-processed-{env}-value.proto'
+        $ref: '../schemas/payments-processed-{env}-value.proto'
