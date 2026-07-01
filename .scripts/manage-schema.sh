@@ -39,7 +39,6 @@ if [ "$MODE" = "validate" ]; then
     echo "Checking if schema already exists for subject: $SUBJECT..."
     
     # ─── NATIVE REGISTRY EXISTENCE CHECK ───────────────────────────────
-    # POST to /subjects/{subject} returns the version if the schema matches exactly
     EXIST_CHECK_RESP=$(curl -s -X POST "${AUTH_FLAGS[@]}" \
         -H "Content-Type: application/vnd.schemaregistry.v1+json" \
         --data "$PAYLOAD" \
@@ -48,7 +47,7 @@ if [ "$MODE" = "validate" ]; then
     EXISTING_VERSION=$(echo "$EXIST_CHECK_RESP" | jq -r '.version // empty')
     
     if [ -n "$EXISTING_VERSION" ]; then
-        echo "ℹ️ Schema matches version $EXISTING_VERSION exactly. Skipping summary and logs."
+        echo "ℹ️ Schema matches version $EXISTING_VERSION exactly. Skipping validation summary and logs."
         exit 0
     fi
     # ───────────────────────────────────────────────────────────────────
@@ -107,6 +106,22 @@ if [ "$MODE" = "validate" ]; then
     echo "Schema is compatible."
 
 elif [ "$MODE" = "push" ]; then
+    echo "Checking if schema already exists before pushing: $SUBJECT..."
+    
+    # ─── NATIVE REGISTRY EXISTENCE CHECK ───────────────────────────────
+    EXIST_CHECK_RESP=$(curl -s -X POST "${AUTH_FLAGS[@]}" \
+        -H "Content-Type: application/vnd.schemaregistry.v1+json" \
+        --data "$PAYLOAD" \
+        "$SCHEMA_REGISTRY_URL/subjects/$SUBJECT")
+    
+    EXISTING_VERSION=$(echo "$EXIST_CHECK_RESP" | jq -r '.version // empty')
+    
+    if [ -n "$EXISTING_VERSION" ]; then
+        echo "ℹ️ Schema matches version $EXISTING_VERSION exactly. Skipping deployment summary and registration."
+        exit 0
+    fi
+    # ───────────────────────────────────────────────────────────────────
+
     if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
         {
             echo "### 🚀 Deployment: \`$SUBJECT\`"
@@ -127,18 +142,4 @@ elif [ "$MODE" = "push" ]; then
 
         if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
             {
-                echo "❌ **Result:** Schema registration failed!"
-                echo "#### Registry Error Details:"
-                echo "\`\`\`json"
-                echo "$RESPONSE" | jq .
-                echo "\`\`\`"
-            } >> "$GITHUB_STEP_SUMMARY"
-        fi
-        echo "Error: Registration failed!"
-        echo "$RESPONSE"
-        exit 1
-    fi
-    
-    [ -n "${GITHUB_STEP_SUMMARY:-}" ] && echo "✅ **Result:** Registered successfully. Assigned ID: \`$SCHEMA_ID\`" >> "$GITHUB_STEP_SUMMARY"
-    echo "Successfully registered schema version. ID: $SCHEMA_ID"
-fi
+                echo "❌ **Result:**
