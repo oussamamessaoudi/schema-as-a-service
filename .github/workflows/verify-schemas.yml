@@ -72,6 +72,7 @@ jobs:
 
   validate-asyncapi-contracts:
     name: Validate AsyncAPI Contracts
+    needs: [generate-matrix]   # no data dependency — only kept to align the workflow graph next to validate-schemas
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
